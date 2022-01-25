@@ -66,6 +66,7 @@ fun main() {
 								// load a byte
 								decodeBuffer[p++] = buffer[pos++]
 							} else {
+								// a zero byte
 								decodeBuffer[p++] = 0
 							}
 							ch2 = ch2 shl 1
@@ -81,12 +82,13 @@ fun main() {
 			}
 			pTarget = p
 			// post decode 1
-			val ch = decodeBuffer[0].toInt()
+			val ch = decodeBuffer[0].toInt() and 0xFF
 			if (ch != 0) {
 				var ch1 = decodeBuffer[1]
 				var start = 1
 				var p2 = start + ch
-				for (j in ch downTo 1) {
+				//for (j in ch downTo 1) {
+				repeat(ch) {
 					while (p2 < nextLinePos) {
 						ch1 = ch1 xor decodeBuffer[p2]
 						decodeBuffer[p2] = ch1
@@ -117,23 +119,23 @@ fun main() {
 			for (j in 0 until 4) {
 				var dest = (height - i - 1) * bpl * 4
 				for (k in 0 until wpl / 2) {
-					val bits = decodeBuffer[src++]
-					if ((bits.toInt() and 0x80) != 0)
+					val bits = decodeBuffer[src++].toInt() and 0xFF
+					if ((bits and 0x80) != 0)
 						bitsBuffer[dest] = bitsBuffer[dest] or (0x10 shl j).toByte()
-					if ((bits.toInt() and 0x40) != 0)
+					if ((bits and 0x40) != 0)
 						bitsBuffer[dest] = bitsBuffer[dest] or (0x01 shl j).toByte()
-					if ((bits.toInt() and 0x20) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 1] or (0x10 shl j).toByte()
-					if ((bits.toInt() and 0x10) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 1] or (0x01 shl j).toByte()
-					if ((bits.toInt() and 0x08) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 2] or (0x10 shl j).toByte()
-					if ((bits.toInt() and 0x04) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 2] or (0x01 shl j).toByte()
-					if ((bits.toInt() and 0x02) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 3] or (0x10 shl j).toByte()
-					if ((bits.toInt() and 0x01) != 0)
-						bitsBuffer[dest] = bitsBuffer[dest + 3] or (0x01 shl j).toByte()
+					if ((bits and 0x20) != 0)
+						bitsBuffer[dest + 1] = bitsBuffer[dest + 1] or (0x10 shl j).toByte()
+					if ((bits and 0x10) != 0)
+						bitsBuffer[dest + 1] = bitsBuffer[dest + 1] or (0x01 shl j).toByte()
+					if ((bits and 0x08) != 0)
+						bitsBuffer[dest + 2] = bitsBuffer[dest + 2] or (0x10 shl j).toByte()
+					if ((bits and 0x04) != 0)
+						bitsBuffer[dest + 2] = bitsBuffer[dest + 2] or (0x01 shl j).toByte()
+					if ((bits and 0x02) != 0)
+						bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x10 shl j).toByte()
+					if ((bits and 0x01) != 0)
+						bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x01 shl j).toByte()
 					dest += 4
 				}
 			}
