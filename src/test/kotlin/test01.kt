@@ -31,7 +31,7 @@ fun main() {
 	val width = buffer.wordAt(imageOffset)
 	val height = buffer.wordAt(imageOffset + 2)
 	val bpl = (width + 7) / 8
-//	println("width=$width, height=$height, bpl=$bpl")
+	println("width=$width, height=$height, bpl=$bpl")
 	val colorCount = buffer.wordAt(paletteOffset)
 	val transColor = buffer.wordAt(paletteOffset + 2)
 	println("colorCount=$colorCount, transColor=$transColor")
@@ -146,6 +146,22 @@ fun main() {
 	FileOutputStream("bits.buf").use {
 		it.write(bitsBuffer)
 	}
+
+	val pixels = bitsBuffer.flatMap { b ->
+		val h = (b.toInt() shr 8) and 0x0F
+		val l = b.toInt() and 0x0F
+		listOf(h, l)
+	}.map { i ->
+		palette[i]
+	}
+	val img = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+	for (y in 0 until height) {
+		for (x in 0 until width) {
+			val i = x + y * width
+			img.raster.setPixel(x, y, pixels[i].asIntArray)
+		}
+	}
+	ImageIO.write(img, "png", File("result.png"))
 }
 
 private fun ByteArray.wordAt(index: Int): Int {
