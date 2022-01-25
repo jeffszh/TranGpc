@@ -14,7 +14,7 @@ fun main() {
 	val image = BufferedImage(600, 400, BufferedImage.TYPE_INT_RGB)
 	for (y in 0 until 400) {
 		for (x in 0 until 600) {
-			image.raster.setPixel(x, y, arrayOf(x, y, 0).toIntArray())
+			image.raster.setPixel(x, y, Rgb(x, y, 0).asIntArray)
 		}
 	}
 	ImageIO.write(image, "png", File("abc.png"))
@@ -38,9 +38,9 @@ fun main() {
 	val palette = (0 until 16).map { Rgb() }
 	palette.forEachIndexed { index, rgb ->
 		val palData = buffer.wordAt(paletteOffset + index * 2 + 4)
-		rgb.g = (palData shr 8) and 0x0F
-		rgb.r = (palData shr 4) and 0x0F
-		rgb.b = palData and 0x0F
+		rgb.g = ((palData shr 8) and 0x0F) shl 4
+		rgb.r = ((palData shr 4) and 0x0F) shl 4
+		rgb.b = (palData and 0x0F) shl 4
 	}
 
 	val bitsBuffer = ByteArray(bpl * 4 * height)
@@ -51,14 +51,16 @@ fun main() {
 	var pTarget = 0
 	val disBuf = 0x180
 	for (s in 0 until scans) {
-		for (i in s until height step scans) {
+		var i = s
+		while (i < height) {
+			//for (i in s until height step scans)
 			var p = pTarget
 			while (p < nextLinePos) {
-				var ch = buffer[pos++].toInt()
+				var ch = buffer[pos++].toInt() and 0xFF
 				repeat(8) {
 					if ((ch and 0x80) != 0) {
 						// needs more
-						val ch2 = buffer[pos++].toInt()
+						var ch2 = buffer[pos++].toInt() and 0xFF
 						repeat(8) {
 							if ((ch2 and 0x80) != 0) {
 								// load a byte
@@ -66,6 +68,7 @@ fun main() {
 							} else {
 								decodeBuffer[p++] = 0
 							}
+							ch2 = ch2 shl 1
 						}
 					} else {
 						// 8 bytes of empty
@@ -134,6 +137,7 @@ fun main() {
 					dest += 4
 				}
 			}
+			i += scans
 		}
 	}
 	println("行不行呢？")
