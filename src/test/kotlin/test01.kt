@@ -117,7 +117,9 @@ fun main() {
 			// ==>
 			// a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
 			for (j in 0 until 4) {
-				var dest = (height - i - 1) * bpl * 4
+				// var dest = (height - i - 1) * bpl * 4
+				// 上面那句是因為原先的程序是要轉換BMP圖片，上下反轉。
+				var dest = i * bpl * 4
 				for (k in 0 until wpl / 2) {
 					val bits = decodeBuffer[src++].toInt() and 0xFF
 					if ((bits and 0x80) != 0)
@@ -148,7 +150,7 @@ fun main() {
 	}
 
 	val pixels = bitsBuffer.flatMap { b ->
-		val h = (b.toInt() shr 8) and 0x0F
+		val h = (b.toInt() shr 4) and 0x0F
 		val l = b.toInt() and 0x0F
 		listOf(h, l)
 	}.map { i ->
@@ -165,9 +167,9 @@ fun main() {
 }
 
 private fun ByteArray.wordAt(index: Int): Int {
-	val l = get(index)
-	val h = get(index + 1)
-	return (h.toInt() shl 8) + l
+	val l = get(index).toInt() and 0xFF
+	val h = get(index + 1).toInt() and 0xFF
+	return (h shl 8) + l
 }
 
 private class Rgb(var r: Int, var g: Int, var b: Int) {
