@@ -1,3 +1,4 @@
+import cn.jeff.tools.gpc.Rgb
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.FileInputStream
@@ -170,12 +171,4 @@ private fun ByteArray.wordAt(index: Int): Int {
 	val l = get(index).toInt() and 0xFF
 	val h = get(index + 1).toInt() and 0xFF
 	return (h shl 8) + l
-}
-
-private class Rgb(var r: Int, var g: Int, var b: Int) {
-
-	constructor() : this(0, 0, 0)
-
-	val asIntArray get() = arrayOf(r, g, b).toIntArray()
-
 }
