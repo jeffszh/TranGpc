@@ -5,6 +5,11 @@ GPC图片转换工具。
 主要是为了【剑芒罗曼史】。
 
 
+### 鸣谢
+非常感谢这篇文章的作者： 
+[https://blog.csdn.net/superarhow/article/details/1575219](https://blog.csdn.net/superarhow/article/details/1575219)
+
+
 #### 软件架构
 软件架构说明
 
