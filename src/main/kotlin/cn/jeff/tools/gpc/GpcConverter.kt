@@ -3,7 +3,6 @@ package cn.jeff.tools.gpc
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
-import kotlin.experimental.or
 import kotlin.experimental.xor
 
 object GpcConverter {
@@ -215,6 +214,7 @@ object GpcConverter {
 	d0 d1 d2 d3 d4 d5 d6 d7
 	==>
 	a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
+	d0c0b0a0 d1c1b1a1 ;
 	```
 
 	 * @param lineNo 行号
@@ -228,9 +228,44 @@ object GpcConverter {
 		displayBuffer: SeekableByteInputOutputStream,
 		bitsBuffer: ByteArray
 	) {
+		val quadBuffer = Array(bpl) { byteIndex ->
+			ByteArray(4) { bitIndex ->
+				displayBuffer[bitIndex * bpl + byteIndex]
+			}
+		}
+		val result = quadBuffer.flatMap { quad ->
+			// 將4個字節拆成32bit
+			val bits = quad.flatMap { byte ->
+				(0 until 8).map { shiftCount ->
+					(byte.toInt() shl shiftCount) and 0x80 != 0
+				}
+			}
+			(0 until 4).map { i ->
+				(0 until 4).sumBy { j ->
+					(if (bits[j * 8 + i * 2]) 0x10 shl j else 0) +
+							(if (bits[j * 8 + i * 2 + 1]) 0x01 shl j else 0)
+					//24 16 8 0 25 17 9 1
+				}.toByte()
+			}
+			/*
+	a0 a1 a2 a3 a4 a5 a6 a7
+	b0 b1 b2 b3 b4 b5 b6 b7
+	c0 c1 c2 c3 c4 c5 c6 c7
+	d0 d1 d2 d3 d4 d5 d6 d7
+	==>
+	a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
+	d0c0b0a0 d1c1b1a1 ; d2c2b2a2 d3c3b3a3
+			 */
+		}
+		val dest = lineNo * bpl * 4
+		result.forEachIndexed { index, byte ->
+			bitsBuffer[dest + index] = byte
+		}
+
+		/*
 		displayBuffer.seek(0)
 		repeat(4) { j ->
-			repeat(bpl * 4 / 4) { i ->
+			repeat(bpl) { i ->
 				val dest = (lineNo * bpl + i) * 4
 				val bits = displayBuffer.readByte()
 				if ((bits and 0x80) != 0)
@@ -251,6 +286,7 @@ object GpcConverter {
 					bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x01 shl j).toByte()
 			}
 		}
+		*/
 	}
 
 	/**
