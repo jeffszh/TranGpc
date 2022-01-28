@@ -214,7 +214,7 @@ object GpcConverter {
 	d0 d1 d2 d3 d4 d5 d6 d7
 	==>
 	a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
-	d0c0b0a0 d1c1b1a1 ;
+	d0c0b0a0 d1c1b1a1 ; 上面那行是錯的，正確的位順序是這行。
 	```
 
 	 * @param lineNo 行号
@@ -228,38 +228,59 @@ object GpcConverter {
 		displayBuffer: SeekableByteInputOutputStream,
 		bitsBuffer: ByteArray
 	) {
-		val quadBuffer = Array(bpl) { byteIndex ->
-			ByteArray(4) { bitIndex ->
-				displayBuffer[bitIndex * bpl + byteIndex]
+		// 先按順序全部讀出來
+		displayBuffer.seek(0)
+		val originQuadList = List(4) {
+			List(bpl) {
+				displayBuffer.readByte()
 			}
 		}
-		val result = quadBuffer.flatMap { quad ->
-			// 將4個字節拆成32bit
-			val bits = quad.flatMap { byte ->
+		// 轉置1，將byteIndex作為外層，bitIndex變為內層。
+		val quadList = List(bpl) { byteIndex ->
+			List(4) { bitIndex ->
+				originQuadList[bitIndex][byteIndex]
+			}
+		}
+		// 內層4個字節拆分為4個8bit。
+		val bit4x8List = quadList.map { quad ->
+			quad.map { byte ->
 				(0 until 8).map { shiftCount ->
-					(byte.toInt() shl shiftCount) and 0x80 != 0
+					(byte shl shiftCount) and 0x80 != 0
 				}
 			}
-			(0 until 4).map { i ->
-				(0 until 4).sumBy { j ->
-					(if (bits[j * 8 + i * 2]) 0x10 shl j else 0) +
-							(if (bits[j * 8 + i * 2 + 1]) 0x01 shl j else 0)
-					//24 16 8 0 25 17 9 1
-				}.toByte()
-			}
-			/*
-	a0 a1 a2 a3 a4 a5 a6 a7
-	b0 b1 b2 b3 b4 b5 b6 b7
-	c0 c1 c2 c3 c4 c5 c6 c7
-	d0 d1 d2 d3 d4 d5 d6 d7
-	==>
-	a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
-	d0c0b0a0 d1c1b1a1 ; d2c2b2a2 d3c3b3a3
-			 */
 		}
+		// 轉置2，內層變為8個4bit。
+		val bit8x4List = bit4x8List.map { bit4x8 ->
+			(0 until 8).map { i ->
+				(0 until 4).map { j ->
+					bit4x8[j][i]
+				}
+			}
+		}
+		// 將最內層的4bit合併為4bit數值。
+		val halfByte8List = bit8x4List.map { bit8x4 ->
+			bit8x4.map { bits ->
+				bits.mapIndexed { index, b ->
+					if (b) 0x01 shl index else 0
+				}.sum()
+			}
+		}
+		// 將8個4bit數值每兩個合併為高低字節。
+		val hl4List = halfByte8List.map { halfByte8 ->
+			(0 until 4).map { i ->
+				HLByte(halfByte8[i * 2], halfByte8[i * 2 + 1])
+			}
+		}
+		// 平直展開
+		val result = hl4List.flatMap { hl4 ->
+			hl4.map { hl ->
+				hl.value
+			}
+		}
+
 		val dest = lineNo * bpl * 4
-		result.forEachIndexed { index, byte ->
-			bitsBuffer[dest + index] = byte
+		result.forEachIndexed { index, value ->
+			bitsBuffer[dest + index] = value.toByte()
 		}
 
 		/*
@@ -374,6 +395,8 @@ object GpcConverter {
 			(int8 ushr 4) and 0x0F,
 			int8 and 0x0F
 		)
+
+		val value get() = h shl 4 or l
 
 		operator fun component1() = h
 		operator fun component2() = l
