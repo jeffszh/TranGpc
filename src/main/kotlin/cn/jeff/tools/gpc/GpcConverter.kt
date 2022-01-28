@@ -101,27 +101,9 @@ object GpcConverter {
 				decodeBuffer.takeOut(nextLinePos)
 
 				// post decode 3
-				/*
-				transposeBits(lineNo, bpl, displayBuffer, bitsBuffer)
-				// 最后一步的解码对应于第一步的编码，
-				// 按道理说，原始图像因为是卡通，本来就应该有大片的相同，
-				// 为何要进行位转置？会增加连续的相同吗？
-				*/
-				// 其實根本無需轉置，
-				// 換個方式理解，displayBuffer的結構就是分成4份，各代表一個bit，
-				// 低位在前，組合起來4bit對應16色調色板。
-				// 每一份裡面每個字節對應8個像素點，高位在前。
 				storeIntoBitsBuffer(lineNo, bpl, displayBuffer, bitsBufferList)
 			}
 		}
-
-//		val pixels = bitsBuffer.flatMap { b ->
-//			val h = (b.toInt() shr 4) and 0x0F
-//			val l = b.toInt() and 0x0F
-//			listOf(h, l)
-//		}.map { i ->
-//			palette[i]
-//		}
 
 		val pixels = (0 until height).flatMap { lineNo ->
 			(0 until width).map { colNo ->
@@ -221,119 +203,11 @@ object GpcConverter {
 		}
 	}
 
-	/*
-	/**
-	 * # 位转置
-	 *
-	 * 难以用文字说清，看下面示意图：
-	 *
-	 * ```
-	4 planes -> b4b4
-	a0 a1 a2 a3 a4 a5 a6 a7
-	b0 b1 b2 b3 b4 b5 b6 b7
-	c0 c1 c2 c3 c4 c5 c6 c7
-	d0 d1 d2 d3 d4 d5 d6 d7
-	==>
-	a0b0c0d0 a1b1c1d1 ; a2b2c2d2 a3b3c3d3 ; a4b4c4d4 a5b5c5d5 ; a6b6c6d6 a7b7c7d7
-	d0c0b0a0 d1c1b1a1 ; 上面那行是錯的，正確的位順序是這行。
-	```
-
-	 * @param lineNo 行号
-	 * @param bpl 每行的字节数
-	 * @param displayBuffer 显示缓冲区
-	 * @param bitsBuffer 最终结果的位缓冲区
-	 */
-	private fun transposeBits(
-		lineNo: Int,
-		bpl: Int,
-		displayBuffer: SeekableByteInputOutputStream,
-		bitsBuffer: ByteArray
-	) {
-		// 先按順序全部讀出來
-		displayBuffer.seek(0)
-		val originQuadList = List(4) {
-			List(bpl) {
-				displayBuffer.readByte()
-			}
-		}
-		// 轉置1，將byteIndex作為外層，bitIndex變為內層。
-		val quadList = List(bpl) { byteIndex ->
-			List(4) { bitIndex ->
-				originQuadList[bitIndex][byteIndex]
-			}
-		}
-		// 內層4個字節拆分為4個8bit。
-		val bit4x8List = quadList.map { quad ->
-			quad.map { byte ->
-				(0 until 8).map { shiftCount ->
-					(byte shl shiftCount) and 0x80 != 0
-				}
-			}
-		}
-		// 轉置2，內層變為8個4bit。
-		val bit8x4List = bit4x8List.map { bit4x8 ->
-			(0 until 8).map { i ->
-				(0 until 4).map { j ->
-					bit4x8[j][i]
-				}
-			}
-		}
-		// 將最內層的4bit合併為4bit數值。
-		val halfByte8List = bit8x4List.map { bit8x4 ->
-			bit8x4.map { bits ->
-				bits.mapIndexed { index, b ->
-					if (b) 0x01 shl index else 0
-				}.sum()
-			}
-		}
-		// 將8個4bit數值每兩個合併為高低字節。
-		val hl4List = halfByte8List.map { halfByte8 ->
-			(0 until 4).map { i ->
-				HLByte(halfByte8[i * 2], halfByte8[i * 2 + 1])
-			}
-		}
-		// 平直展開
-		val result = hl4List.flatMap { hl4 ->
-			hl4.map { hl ->
-				hl.value
-			}
-		}
-
-		val dest = lineNo * bpl * 4
-		result.forEachIndexed { index, value ->
-			bitsBuffer[dest + index] = value.toByte()
-		}
-
-		/*
-		displayBuffer.seek(0)
-		repeat(4) { j ->
-			repeat(bpl) { i ->
-				val dest = (lineNo * bpl + i) * 4
-				val bits = displayBuffer.readByte()
-				if ((bits and 0x80) != 0)
-					bitsBuffer[dest] = bitsBuffer[dest] or (0x10 shl j).toByte()
-				if ((bits and 0x40) != 0)
-					bitsBuffer[dest] = bitsBuffer[dest] or (0x01 shl j).toByte()
-				if ((bits and 0x20) != 0)
-					bitsBuffer[dest + 1] = bitsBuffer[dest + 1] or (0x10 shl j).toByte()
-				if ((bits and 0x10) != 0)
-					bitsBuffer[dest + 1] = bitsBuffer[dest + 1] or (0x01 shl j).toByte()
-				if ((bits and 0x08) != 0)
-					bitsBuffer[dest + 2] = bitsBuffer[dest + 2] or (0x10 shl j).toByte()
-				if ((bits and 0x04) != 0)
-					bitsBuffer[dest + 2] = bitsBuffer[dest + 2] or (0x01 shl j).toByte()
-				if ((bits and 0x02) != 0)
-					bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x10 shl j).toByte()
-				if ((bits and 0x01) != 0)
-					bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x01 shl j).toByte()
-			}
-		}
-		*/
-	}
-	*/
-
 	/**
 	 * # 存入到位緩衝區
+	 *
+	 * displayBuffer的結構就是分成4等分，各代表一個bit，低位在前，組合起來4bit對應16色調色板。
+	 * 每一份裡面每個字節對應8個像素點，高位在前。
 	 *
 	 * @param lineNo 行号
 	 * @param bpl 每行的字节数
