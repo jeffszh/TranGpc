@@ -230,11 +230,8 @@ object GpcConverter {
 	) {
 		displayBuffer.seek(0)
 		for (j in 0 until 4) {
-			// var dest = (height - i - 1) * bpl * 4
-			// 上面那句是因為原先的C语言程序是要轉換BMP圖片，上下反轉，
-			// 现在是转换成png图片了，所以改为下面这句了。
-			var dest = lineNo * bpl * 4
-			for (k in 0 until (bpl * 4 + 1) / 4) {
+			repeat(bpl * 4 / 4) { i ->
+				val dest = (lineNo * bpl + i) * 4
 				val bits = displayBuffer.readByte()
 				if ((bits and 0x80) != 0)
 					bitsBuffer[dest] = bitsBuffer[dest] or (0x10 shl j).toByte()
@@ -252,7 +249,6 @@ object GpcConverter {
 					bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x10 shl j).toByte()
 				if ((bits and 0x01) != 0)
 					bitsBuffer[dest + 3] = bitsBuffer[dest + 3] or (0x01 shl j).toByte()
-				dest += 4
 			}
 		}
 	}
