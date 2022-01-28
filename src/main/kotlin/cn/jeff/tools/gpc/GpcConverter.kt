@@ -69,7 +69,9 @@ object GpcConverter {
 			rgb.b = lByte.l shl 4
 		}
 
-		val bitsBuffer = ByteArray(bpl * 4 * height)
+		val bitsBufferList = List(4) {
+			BooleanArray(bpl * height * 8)
+		}
 		source.seek(imageOffset + 0x10)
 		val decodeBuffer = SeekableByteInputOutputStream(ByteArray(1024))
 		val displayBuffer = SeekableByteInputOutputStream(ByteArray(1024))
@@ -99,19 +101,37 @@ object GpcConverter {
 				decodeBuffer.takeOut(nextLinePos)
 
 				// post decode 3
+				/*
 				transposeBits(lineNo, bpl, displayBuffer, bitsBuffer)
 				// 最后一步的解码对应于第一步的编码，
 				// 按道理说，原始图像因为是卡通，本来就应该有大片的相同，
 				// 为何要进行位转置？会增加连续的相同吗？
+				*/
+				// 其實根本無需轉置，
+				// 換個方式理解，displayBuffer的結構就是分成4份，各代表一個bit，
+				// 低位在前，組合起來4bit對應16色調色板。
+				// 每一份裡面每個字節對應8個像素點，高位在前。
+				storeIntoBitsBuffer(lineNo, bpl, displayBuffer, bitsBufferList)
 			}
 		}
 
-		val pixels = bitsBuffer.flatMap { b ->
-			val h = (b.toInt() shr 4) and 0x0F
-			val l = b.toInt() and 0x0F
-			listOf(h, l)
-		}.map { i ->
-			palette[i]
+//		val pixels = bitsBuffer.flatMap { b ->
+//			val h = (b.toInt() shr 4) and 0x0F
+//			val l = b.toInt() and 0x0F
+//			listOf(h, l)
+//		}.map { i ->
+//			palette[i]
+//		}
+
+		val pixels = (0 until height).flatMap { lineNo ->
+			(0 until width).map { colNo ->
+				palette[(0 until 4).sumBy { bitIndex ->
+					if (bitsBufferList[bitIndex][lineNo * bpl * 8 + colNo])
+						0x01 shl bitIndex
+					else
+						0
+				}]
+			}
 		}
 		op(width, height, pixels)
 	}
@@ -201,6 +221,7 @@ object GpcConverter {
 		}
 	}
 
+	/*
 	/**
 	 * # 位转置
 	 *
@@ -309,6 +330,34 @@ object GpcConverter {
 		}
 		*/
 	}
+	*/
+
+	/**
+	 * # 存入到位緩衝區
+	 *
+	 * @param lineNo 行号
+	 * @param bpl 每行的字节数
+	 * @param displayBuffer 显示缓冲区
+	 * @param bitsBufferList 最终结果的位缓冲区
+	 */
+	private fun storeIntoBitsBuffer(
+		lineNo: Int,
+		bpl: Int,
+		displayBuffer: SeekableByteInputOutputStream,
+		bitsBufferList: List<BooleanArray>
+	) {
+		val dest = lineNo * bpl
+		displayBuffer.seek(0)
+		bitsBufferList.forEach { bitArray ->
+			repeat(bpl) { byteIndex ->
+				val byteValue = displayBuffer.readByte()
+				repeat(8) { shiftCount ->
+					bitArray[(dest + byteIndex) * 8 + shiftCount] =
+						(0x80 ushr shiftCount) and byteValue != 0
+				}
+			}
+		}
+	}
 
 	/**
 	 * # 可随机访问的字节流
@@ -396,7 +445,7 @@ object GpcConverter {
 			int8 and 0x0F
 		)
 
-		val value get() = h shl 4 or l
+		// val value get() = h shl 4 or l
 
 		operator fun component1() = h
 		operator fun component2() = l
