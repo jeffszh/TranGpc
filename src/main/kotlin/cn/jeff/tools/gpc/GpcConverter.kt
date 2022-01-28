@@ -229,7 +229,7 @@ object GpcConverter {
 		bitsBuffer: ByteArray
 	) {
 		displayBuffer.seek(0)
-		for (j in 0 until 4) {
+		repeat(4) { j ->
 			repeat(bpl * 4 / 4) { i ->
 				val dest = (lineNo * bpl + i) * 4
 				val bits = displayBuffer.readByte()
