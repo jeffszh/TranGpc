@@ -182,6 +182,7 @@ object GpcConverter2 {
 			var ch = source.readByte()
 			repeat(8) {
 				if ((ch and 0x80) != 0) {
+					if (source.eof()) return
 					// needs more
 					var ch2 = source.readByte()
 					repeat(8) {
@@ -223,18 +224,18 @@ object GpcConverter2 {
 		lineLen: Int
 	) {
 		val distance = inputChannel.receive().toInt() and 0xFF
-		if (distance > 0) {
-			val chars = ByteArray(distance) { 0.toByte() }
-			repeat(lineLen) { ind ->
-				val chInd = ind % distance
-				val ch = inputChannel.receive() xor chars[chInd]
-				chars[chInd] = ch
-				outputChannel.send(ch)
+		val buffer = ByteArray(lineLen) {
+			inputChannel.receive()
+		}
+		var ch = 0.toByte()
+		repeat(distance) { ind ->
+			for (p in ind until lineLen step distance) {
+				ch = ch xor buffer[p]
+				buffer[p] = ch
 			}
-		} else {
-			repeat(lineLen) {
-				outputChannel.send(inputChannel.receive())
-			}
+		}
+		buffer.forEach {
+			outputChannel.send(it)
 		}
 	}
 
