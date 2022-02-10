@@ -7,6 +7,7 @@ import kotlin.experimental.xor
 
 object GpcConverter {
 
+	@Suppress("DuplicatedCode")
 	@JvmStatic
 	fun main(args: Array<String>) {
 		println("开始转换……")
@@ -28,6 +29,7 @@ object GpcConverter {
 		println("转换完成。")
 	}
 
+	@Suppress("DuplicatedCode")
 	private fun convertGpcToPng(gpcFile: File, pngFile: File) {
 		val data = gpcFile.readBytes()
 		decodeGpc(data) { width, height, pixels ->
@@ -42,6 +44,7 @@ object GpcConverter {
 		}
 	}
 
+	@Suppress("DuplicatedCode")
 	private fun decodeGpc(
 		data: ByteArray,
 		op: (width: Int, height: Int, pixels: List<Rgb>) -> Unit

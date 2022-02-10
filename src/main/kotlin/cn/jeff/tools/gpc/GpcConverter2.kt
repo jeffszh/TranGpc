@@ -1,5 +1,7 @@
 package cn.jeff.tools.gpc
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
@@ -7,6 +9,7 @@ import kotlin.experimental.xor
 
 object GpcConverter2 {
 
+	@Suppress("DuplicatedCode")
 	@JvmStatic
 	fun main(args: Array<String>) {
 		println("开始转换……")
@@ -28,6 +31,7 @@ object GpcConverter2 {
 		println("转换完成。")
 	}
 
+	@Suppress("DuplicatedCode")
 	private fun convertGpcToPng(gpcFile: File, pngFile: File) {
 		val data = gpcFile.readBytes()
 		decodeGpc(data) { width, height, pixels ->
@@ -42,6 +46,7 @@ object GpcConverter2 {
 		}
 	}
 
+	@Suppress("DuplicatedCode")
 	private fun decodeGpc(
 		data: ByteArray,
 		op: (width: Int, height: Int, pixels: List<Rgb>) -> Unit
@@ -73,15 +78,53 @@ object GpcConverter2 {
 			BooleanArray(bpl * height * 8)
 		}
 		source.seek(imageOffset + 0x10)
-		val decodeBuffer = SeekableByteInputOutputStream(ByteArray(1024))
-		val displayBuffer = SeekableByteInputOutputStream(ByteArray(1024))
+//		val decodeBuffer = SeekableByteInputOutputStream(ByteArray(1024))
+//		val displayBuffer = SeekableByteInputOutputStream(ByteArray(1024))
 
 		/** 每行的字（16bit）数 */
 		val wpl = (bpl * 4 + 1) / 2
 
 		/** 下一行的位置（是奇数，因为每行第一个字节是特殊的，其他才是图像数据。） */
-		val nextLinePos = wpl * 2 + 1
+//		val nextLinePos = wpl * 2 + 1
 
+		val channel1 = Channel<Byte>(1024)
+		val channel2 = Channel<Byte>()
+		val channel3 = Channel<Byte>()
+
+		val job1 = GlobalScope.launch {
+			decodeFromSource(source, channel1)
+		}
+		val job2 = GlobalScope.launch {
+			repeat(height) {
+				horizontalXorDecode(channel1, channel2, wpl * 2)
+			}
+		}
+		val job3 = GlobalScope.launch {
+			val lineBuffer = ByteArray(wpl * 2)
+			repeat(height) {
+				verticalXorDecode(channel2, channel3, lineBuffer, wpl * 2)
+			}
+		}
+		val job4 = GlobalScope.launch {
+			for (scan in 0 until scanLines) {
+				// 隔行扫描
+				for (lineNo in scan until height step scanLines) {
+					storeIntoBitsBuffer(lineNo, bpl, channel3, bitsBufferList)
+				}
+			}
+		}
+
+		runBlocking {
+			job1.join()
+			job2.join()
+			job3.join()
+			job4.join()
+			channel1.close()
+			channel2.close()
+			channel3.close()
+		}
+
+		/*
 		for (scan in 0 until scanLines) {
 			// 隔行扫描
 			for (lineNo in scan until height step scanLines) {
@@ -104,6 +147,7 @@ object GpcConverter2 {
 				storeIntoBitsBuffer(lineNo, bpl, displayBuffer, bitsBufferList)
 			}
 		}
+		*/
 
 		val pixels = (0 until height).flatMap { lineNo ->
 			(0 until width).map { colNo ->
@@ -119,7 +163,7 @@ object GpcConverter2 {
 	}
 
 	/**
-	 * # 解码出超过一行字节数的数据
+	 * # 从源数据解码
 	 *
 	 * 具体过程如下：
 	 * * 源数据取出一个字节，8位从高到低，若为0，则填充目标8个字节的0；
@@ -128,15 +172,13 @@ object GpcConverter2 {
 	 * * 若不为0，则从源数据读一个字节，填入目标中。
 	 *
 	 * @param source 源缓冲区
-	 * @param decodeBuffer 解码目标缓冲区
-	 * @param nextLinePos 下一行的位置
+	 * @param outputChannel 输出到下一级job的通道
 	 */
-	private fun decodeFromSourceAtLeaseOneLine(
+	private suspend fun decodeFromSource(
 		source: SeekableByteInputOutputStream,
-		decodeBuffer: SeekableByteInputOutputStream,
-		nextLinePos: Int
+		outputChannel: Channel<Byte>
 	) {
-		while (decodeBuffer.pos < nextLinePos) {
+		while (!source.eof()) {
 			var ch = source.readByte()
 			repeat(8) {
 				if ((ch and 0x80) != 0) {
@@ -145,17 +187,17 @@ object GpcConverter2 {
 					repeat(8) {
 						if ((ch2 and 0x80) != 0) {
 							// load a byte
-							decodeBuffer.writeByte(source.readByte())
+							outputChannel.send(source.readByte().toByte())
 						} else {
 							// a zero byte
-							decodeBuffer.writeByte(0)
+							outputChannel.send(0.toByte())
 						}
 						ch2 = ch2 shl 1
 					}
 				} else {
 					// 8 bytes of empty
 					repeat(8) {
-						decodeBuffer.writeByte(0)
+						outputChannel.send(0.toByte())
 					}
 				}
 				ch = ch shl 1
@@ -164,7 +206,7 @@ object GpcConverter2 {
 	}
 
 	/**
-	 * # 异或解码
+	 * # 水平方向异或解码
 	 *
 	 * 算法如下：
 	 * 第一个字节为一组数据的长度。
@@ -172,16 +214,26 @@ object GpcConverter2 {
 	 * 然后回头异或到第一组数据的第二个字节，再异或到下一组数据的第二个字节，直到行末；
 	 * 然后回头异或到第一组数据的第三字节……
 	 *
-	 * @param decodeBuffer 解码缓冲区
-	 * @param nextLinePos 下一行的位置
+	 * @param inputChannel 来自上一级的输入
+	 * @param outputChannel 送到下一级的输出
+	 * @param lineLen 行长度，字节数，必为4的倍数。
 	 */
-	private fun xorDecode(decodeBuffer: SeekableByteInputOutputStream, nextLinePos: Int) {
-		val distance = decodeBuffer[0].toInt() and 0xFF
-		var ch = 0.toByte()
-		repeat(distance) { ind ->
-			for (p in ind + 1 until nextLinePos step distance) {
-				ch = ch xor decodeBuffer[p]
-				decodeBuffer[p] = ch
+	private suspend fun horizontalXorDecode(
+		inputChannel: Channel<Byte>, outputChannel: Channel<Byte>,
+		lineLen: Int
+	) {
+		val distance = inputChannel.receive().toInt() and 0xFF
+		if (distance > 0) {
+			val chars = ByteArray(distance) { 0.toByte() }
+			repeat(lineLen) { ind ->
+				val chInd = ind % distance
+				val ch = inputChannel.receive() xor chars[chInd]
+				chars[chInd] = ch
+				outputChannel.send(ch)
+			}
+		} else {
+			repeat(lineLen) {
+				outputChannel.send(inputChannel.receive())
 			}
 		}
 	}
@@ -189,17 +241,20 @@ object GpcConverter2 {
 	/**
 	 * # 将数据异或到显示缓冲区
 	 *
-	 * @param decodeBuffer 解码缓冲区
-	 * @param wpl 每行的字数
+	 * @param inputChannel 来自上一级的输入
+	 * @param outputChannel 送到下一级的输出
+	 * @param lineBuffer 行缓冲区，用于每行之间进行异或操作。
+	 * @param lineLen 行长度，字节数，必为4的倍数。
 	 */
-	private fun xorToDisplayBuffer(
-		decodeBuffer: SeekableByteInputOutputStream,
-		displayBuffer: SeekableByteInputOutputStream,
-		wpl: Int
+	private suspend fun verticalXorDecode(
+		inputChannel: Channel<Byte>, outputChannel: Channel<Byte>,
+		lineBuffer: ByteArray,
+		lineLen: Int
 	) {
-		for (j in 0 until wpl * 2) {
-			// 注：[decodeBuffer]中第一个字节是特殊的，后续的才是图像数据。
-			displayBuffer[j] = displayBuffer[j] xor decodeBuffer[j + 1]
+		repeat(lineLen) { ind ->
+			val ch = inputChannel.receive() xor lineBuffer[ind]
+			lineBuffer[ind] = ch
+			outputChannel.send(ch)
 		}
 	}
 
@@ -211,20 +266,19 @@ object GpcConverter2 {
 	 *
 	 * @param lineNo 行号
 	 * @param bpl 每行的字节数
-	 * @param displayBuffer 显示缓冲区
+	 * @param inputChannel 来自上一级的输入
 	 * @param bitsBufferList 最终结果的位缓冲区
 	 */
-	private fun storeIntoBitsBuffer(
+	private suspend fun storeIntoBitsBuffer(
 		lineNo: Int,
 		bpl: Int,
-		displayBuffer: SeekableByteInputOutputStream,
+		inputChannel: Channel<Byte>,
 		bitsBufferList: List<BooleanArray>
 	) {
 		val dest = lineNo * bpl
-		displayBuffer.seek(0)
 		bitsBufferList.forEach { bitArray ->
 			repeat(bpl) { byteIndex ->
-				val byteValue = displayBuffer.readByte()
+				val byteValue = inputChannel.receive().toInt() and 0xFF
 				repeat(8) { shiftCount ->
 					bitArray[(dest + byteIndex) * 8 + shiftCount] =
 						(0x80 ushr shiftCount) and byteValue != 0
@@ -246,6 +300,8 @@ object GpcConverter2 {
 			pos = offset
 		}
 
+		fun eof() = pos >= byteArray.size
+
 		fun readByte(): Int {
 			val b = byteArray[pos++]
 			return b.toInt() and 0xFF
@@ -256,9 +312,9 @@ object GpcConverter2 {
 //			return readByte()
 //		}
 
-		fun writeByte(b: Int) {
-			byteArray[pos++] = (b and 0xFF).toByte()
-		}
+//		fun writeByte(b: Int) {
+//			byteArray[pos++] = (b and 0xFF).toByte()
+//		}
 
 //		fun writeByteAt(offset: Int, b: Int) {
 //			seek(offset)
@@ -283,21 +339,21 @@ object GpcConverter2 {
 			byteArray[index] = value
 		}
 
-		/**
-		 * # 取走数据
-		 *
-		 * 从缓冲区头部，去掉[byteCount]个字节，
-		 * 剩余的字节，即从[byteCount] (包括）到[pos] (不包括)的字节，
-		 * 向前搬移（搬到最开头）。
-		 *
-		 * @param byteCount 要取走的字节数。
-		 */
-		fun takeOut(byteCount: Int) {
-			for (i in byteCount until pos) {
-				byteArray[i - byteCount] = byteArray[i]
-			}
-			pos -= byteCount
-		}
+//		/**
+//		 * # 取走数据
+//		 *
+//		 * 从缓冲区头部，去掉[byteCount]个字节，
+//		 * 剩余的字节，即从[byteCount] (包括）到[pos] (不包括)的字节，
+//		 * 向前搬移（搬到最开头）。
+//		 *
+//		 * @param byteCount 要取走的字节数。
+//		 */
+//		fun takeOut(byteCount: Int) {
+//			for (i in byteCount until pos) {
+//				byteArray[i - byteCount] = byteArray[i]
+//			}
+//			pos -= byteCount
+//		}
 
 	}
 
