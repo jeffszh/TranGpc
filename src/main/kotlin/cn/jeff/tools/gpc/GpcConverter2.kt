@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.awt.image.BufferedImage
 import java.io.File
+import java.util.*
 import javax.imageio.ImageIO
 import kotlin.experimental.xor
 
@@ -13,6 +14,7 @@ object GpcConverter2 {
 	@JvmStatic
 	fun main(args: Array<String>) {
 		println("开始转换……")
+		val startTime = Date().time
 		val path = File("TTN2/YOHGAS/GPC/")
 		val files = path.listFiles { _, name ->
 			name.endsWith(".GPC", ignoreCase = true)
@@ -28,7 +30,9 @@ object GpcConverter2 {
 			println("$gpcFile ===> $pngFile")
 			convertGpcToPng(gpcFile, pngFile)
 		}
+		val endTime = Date().time
 		println("转换完成。")
+		println("用时：${endTime - startTime}毫秒。")
 	}
 
 	@Suppress("DuplicatedCode")
