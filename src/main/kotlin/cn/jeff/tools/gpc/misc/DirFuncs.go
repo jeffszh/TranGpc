@@ -34,3 +34,7 @@ func WalkDir(dirPth, suffix string) []string {
 //	os.ReadDir(dirPath)
 //	ioutil.ReadDir(dirPath)
 //}
+
+func GetWord(data []byte, ind int) uint16 {
+	return uint16(data[ind]) | uint16(data[ind+1])<<8
+}
