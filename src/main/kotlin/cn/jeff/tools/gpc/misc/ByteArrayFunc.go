@@ -13,6 +13,14 @@ type SeekableInputOutputStream interface {
 	ReadWordAt(offset int) int
 }
 
+// 通过接口配合结构，可产生面向对象的效果，
+// 但注意：实现方法的时候一定要用结构的指针类型，
+// 否则，跟C语言一样，传参会将结构复制一份，里面改动了不会反映到外面。
+// 例：
+//  func (stream *seekableByteInputOutputStream) Seek(offset int) { ...
+// 可行，但，
+//  func (stream seekableByteInputOutputStream) Seek(offset int) { ...
+// 却不可行，Seek返回后，内部的指针不会变。
 type seekableByteInputOutputStream struct {
 	// 内容数组
 	byteArray []byte
