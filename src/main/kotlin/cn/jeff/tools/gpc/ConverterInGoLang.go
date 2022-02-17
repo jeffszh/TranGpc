@@ -1,11 +1,10 @@
 package main
 
 import (
-	"./misc"
+	. "./misc"
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ func main() {
 	println("开始转换……")
 	t1 := time.Now().UnixMilli()
 
-	for _, gpcFile := range misc.WalkDir(filePath, ".GPC") {
+	for _, gpcFile := range WalkDir(filePath, ".GPC") {
 		pngFile := strings.Replace(gpcFile, ".GPC", ".png", 1)
 		convertGpcToPng(gpcFile, pngFile)
 	}
@@ -37,13 +36,20 @@ func convertGpcToPng(gpcFile string, pngFile string) {
 			img.Set(x, y, pixels[x+y*width])
 		}
 	}
-	out, _ := os.Create(pngFile)
-	_ = png.Encode(out, img)
+	fmt.Printf("width=%d, height=%d\n", width, height)
+	//out, _ := os.Create(pngFile)
+	//_ = png.Encode(out, img)
 }
 
 func decodeGpc(data []byte) (width, height int, pixels []color.RGBA) {
-	width = 0
-	height = 0
-	pixels = nil
+	source := NewSeekableByteInputOutputStream(data)
+	//scanLines := source.ReadWordAt(0x10)
+	//paletteOffset := source.ReadWordAt(0x14)
+	imageOffset := source.ReadWordAt(0x18)
+	source.Seek(imageOffset)
+	width = source.ReadWord()
+	height = source.ReadWord()
+
+	pixels = make([]color.RGBA, width*height)
 	return width, height, pixels
 }
