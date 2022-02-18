@@ -11,13 +11,13 @@ object TestSpeed02 {
 		println("开始")
 		val channel = Channel<Int>()
 		val t1 = Date().time
-		repeat(10000000) { i ->
+		repeat(10_000_000) { i ->
 			TestSpeed01.printIt(i)
 		}
 		val t2 = Date().time
 
 		val job1 = GlobalScope.launch {
-			repeat(10000000) { i ->
+			repeat(10_000_000) { i ->
 				channel.send(i)
 			}
 			channel.send(-1)

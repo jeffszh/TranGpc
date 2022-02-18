@@ -8,7 +8,7 @@ object TestSpeed01 {
 		println("开始")
 		val queue = SynchronousQueue<Int>()
 		val t1 = Date().time
-		repeat(10000000) { i ->
+		repeat(10_000_000) { i ->
 			printIt(i)
 		}
 		val t2 = Date().time
@@ -17,7 +17,7 @@ object TestSpeed01 {
 	}
 
 	fun printIt(intVal: Int) {
-		if (intVal % 100000 == 0) {
+		if (intVal % 100_000 == 0) {
 			println(intVal)
 		}
 	}
