@@ -1,5 +1,6 @@
 import java.util.*
 import java.util.concurrent.SynchronousQueue
+import kotlin.concurrent.thread
 
 object TestSpeed01 {
 
@@ -13,7 +14,26 @@ object TestSpeed01 {
 		}
 		val t2 = Date().time
 
-		println("耗时：${t2 - t1}毫秒。")
+		val thread1 = thread {
+			repeat(10_000_000) { i ->
+				queue.put(i)
+			}
+			queue.put(-1)
+		}
+		val thread2 = thread {
+			while (true) {
+				val intVal = queue.take()
+				if (intVal < 0) break
+				printIt(intVal)
+			}
+		}
+		thread1.join()
+		thread2.join()
+		val t3 = Date().time
+
+		println("耗时1：${t2 - t1}毫秒；")
+		println("耗时2：${t3 - t2}毫秒；")
+		println("相差：${(t3 - t2) - (t2 - t1)}毫秒。")
 	}
 
 	fun printIt(intVal: Int) {

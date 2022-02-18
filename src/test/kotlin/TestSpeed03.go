@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -33,9 +34,9 @@ func main() {
 	close(channel)
 	t3 := time.Now().UnixMilli()
 
-	println("耗时1：%d毫秒；", t2-t1)
-	println("耗时2：%d毫秒；", t3-t2)
-	println("相差：%d毫秒。", (t3-t2)-(t2-t1))
+	fmt.Printf("耗时1：%d毫秒；\n", t2-t1)
+	fmt.Printf("耗时2：%d毫秒；\n", t3-t2)
+	fmt.Printf("相差：%d毫秒。\n", (t3-t2)-(t2-t1))
 }
 
 func printIt(intVal int) {
