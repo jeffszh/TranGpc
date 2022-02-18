@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,8 +41,8 @@ func convertGpcToPng(gpcFile string, pngFile string) {
 		}
 	}
 	fmt.Printf("width=%d, height=%d\n", width, height)
-	out, _ := os.Create(pngFile)
-	_ = png.Encode(out, img)
+	//out, _ := os.Create(pngFile)
+	//_ = png.Encode(out, img)
 }
 
 func decodeGpc(data []byte) (width, height int, pixels [][]color.RGBA) {

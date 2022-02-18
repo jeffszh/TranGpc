@@ -44,7 +44,7 @@ object GpcConverter {
 					img.raster.setPixel(x, y, pixels[i].asIntArray)
 				}
 			}
-			ImageIO.write(img, "png", pngFile)
+//			ImageIO.write(img, "png", pngFile)
 		}
 	}
 
