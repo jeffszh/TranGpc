@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/png"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +20,9 @@ func main() {
 	t1 := time.Now().UnixMilli()
 
 	for _, gpcFile := range WalkDir(filePath, ".GPC") {
-		pngFile := strings.Replace(gpcFile, ".GPC", ".png", 1)
+		//pngFile := strings.Replace(gpcFile, ".GPC", ".png", 1)
+		pngFile := "png/" +
+			strings.Replace(filepath.Base(gpcFile), ".GPC", ".png", 1)
 		convertGpcToPng(gpcFile, pngFile)
 	}
 
@@ -34,15 +38,15 @@ func convertGpcToPng(gpcFile string, pngFile string) {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			img.Set(x, y, pixels[x+y*width])
+			img.Set(x, y, pixels[x][y])
 		}
 	}
 	fmt.Printf("width=%d, height=%d\n", width, height)
-	//out, _ := os.Create(pngFile)
-	//_ = png.Encode(out, img)
+	out, _ := os.Create(pngFile)
+	_ = png.Encode(out, img)
 }
 
-func decodeGpc(data []byte) (width, height int, pixels []color.RGBA) {
+func decodeGpc(data []byte) (width, height int, pixels [][]color.RGBA) {
 	source := NewSeekableByteInputOutputStream(data)
 	scanLines := source.ReadWordAt(0x10)
 	paletteOffset := source.ReadWordAt(0x14)
@@ -121,7 +125,21 @@ func decodeGpc(data []byte) (width, height int, pixels []color.RGBA) {
 	close(channel2)
 	close(channel3)
 
-	pixels = make([]color.RGBA, width*height)
+	pixels = make([][]color.RGBA, width)
+	for i := range pixels {
+		pixels[i] = make([]color.RGBA, height)
+	}
+	for lineNo := 0; lineNo < height; lineNo++ {
+		for colNo := 0; colNo < width; colNo++ {
+			sum := 0
+			for bitIndex := 0; bitIndex < 4; bitIndex++ {
+				if bitsBufferList[bitIndex][lineNo*bpl*8+colNo] {
+					sum += 0x01 << bitIndex
+				}
+			}
+			pixels[colNo][lineNo] = palette[sum]
+		}
+	}
 	return width, height, pixels
 }
 
