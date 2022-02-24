@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import matplotlib.image as mp_img
+import matplotlib.pyplot as plt
 
 inputFilePath = "TTN2/YOHGAS/GPC/"
 outputFilePath = "png/"
@@ -26,8 +27,9 @@ def main():
 
 
 def convert_gpc_to_png(gpc_file, png_file):
-    print "%s ===> %s" % (gpc_file, png_file)
-    mp_img.imsave()
+    print("%s ===> %s" % (gpc_file, png_file))
+    # mp_img.imsave()
+    # plt.imsave()
 
 
 if __name__ == '__main__':

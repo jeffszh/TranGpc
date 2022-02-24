@@ -24,7 +24,7 @@
       <configuration />
     </facet>
     <facet type="Python" name="Python">
-      <configuration sdkName="Python 2.7" />
+      <configuration sdkName="Python 3.8" />
     </facet>
   </component>
   <component name="Go" enabled="true" />
@@ -52,6 +52,6 @@
     <orderEntry type="library" scope="TEST" name="Maven: org.jetbrains.kotlin:kotlin-test-common:1.4.32" level="project" />
     <orderEntry type="library" name="Maven: org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1" level="project" />
     <orderEntry type="library" name="Maven: org.jetbrains.kotlinx:kotlinx-coroutines-core-common:1.1.1" level="project" />
-    <orderEntry type="library" name="Python 2.7 interpreter library" level="application" />
+    <orderEntry type="library" name="Python 3.8 interpreter library" level="application" />
   </component>
 </module>
